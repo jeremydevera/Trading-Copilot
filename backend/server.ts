@@ -18,6 +18,7 @@ import {
 import { connectSymbol, startAutoConnect, getLivePrice, subscribeKline, subscribePrice } from './services/BinanceWebSocket.js';
 import { fetchFuturesSymbols } from './services/BinanceService.js';
 import { processAutoTrades } from './services/AutoTradeService.js';
+import { analyzeTradeHistory, type AIAnalysisResult } from './services/OpenAIService.js';
 import { supabaseAdmin } from './lib/supabase.js';
 
 const app = express();
@@ -55,6 +56,7 @@ app.get('/', (_req: Request, res: Response) => {
       'GET /api/health',
       'GET /api/futures-symbols',
       'GET /api/signal/:symbol?mode=normal|pro (full refresh)',
+      'POST /api/ai/analyze/:userId (ChatGPT trade analysis)',
       'GET /api/cached-signal/:symbol (cached, no refresh)',
       'GET /api/candles/:symbol?interval=5m|15m|1h|4h',
       'GET /api/price/:symbol',
@@ -328,6 +330,23 @@ app.get('/api/users/:userId/auto-trade-stats', async (req: Request, res: Respons
     res.status(500).json({
       error: 'Failed to fetch auto-trade stats',
       details: error.message,
+    });
+  }
+});
+
+// ── AI Analysis Endpoint ─────────────────────────────────────
+
+app.post('/api/ai/analyze/:userId', async (req: Request, res: Response) => {
+  const userId = String(req.params.userId);
+
+  try {
+    const result = await analyzeTradeHistory(userId);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[AI Analyze] Error:', error.message);
+    const status = error.message.includes('OPENAI_API_KEY') ? 400 : 500;
+    res.status(status).json({
+      error: error.message,
     });
   }
 });

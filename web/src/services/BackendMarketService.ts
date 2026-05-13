@@ -132,6 +132,29 @@ export async function fetchFuturesSymbols(): Promise<FuturesSymbolInfo[]> {
   }
 }
 
+// ── AI Analysis ───────────────────────────────────────────────
+
+export interface AIAnalysisResult {
+  summary: string;
+  winRate: number;
+  totalTrades: number;
+  avgProfitPercent: number;
+  avgLossPercent: number;
+  bestConditions: string[];
+  worstConditions: string[];
+  weightAdjustments: {
+    category: string;
+    currentMax: number;
+    suggestedMax: number;
+    reason: string;
+  }[];
+  rawResponse: string;
+}
+
+export async function fetchAIAnalysis(userId: string): Promise<AIAnalysisResult> {
+  return fetchJson<AIAnalysisResult>(`/api/ai/analyze/${userId}`, 0); // no retry for AI
+}
+
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
   try {
     const data = await fetchJson<{ rates: Record<string, number>; timestamp: number }>('/api/exchange-rates');

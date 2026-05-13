@@ -4,6 +4,7 @@ import { BUY_SOUND_OPTIONS, SELL_SOUND_OPTIONS, previewSound, type SoundId } fro
 import { useAuth } from '../hooks/useAuth';
 import { saveUserConfigToSupabase } from '../services/SupabaseSync';
 import { getSocketFeeds, type SocketFeedConfig } from '../data/socketFeeds';
+import { fetchAIAnalysis, type AIAnalysisResult } from '../services/BackendMarketService';
 
 interface SettingsTabProps { vm: any; }
 
@@ -12,6 +13,9 @@ export default function SettingsTab({ vm }: SettingsTabProps) {
   const pt = vm.paperTrading;
   const socketFeeds: SocketFeedConfig[] = getSocketFeeds(vm.cryptoPair);
   const [pendingFeedId, setPendingFeedId] = useState(vm.selectedLiveFeedId ?? 'binance-futures-bookticker');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const selectedFeed = socketFeeds.find(feed => feed.id === vm.selectedLiveFeedId) ?? socketFeeds.find(feed => feed.id === 'binance-futures-bookticker');
   const pendingFeed = socketFeeds.find(feed => feed.id === pendingFeedId) ?? selectedFeed;
   const feedGroups = socketFeeds.reduce<Record<string, SocketFeedConfig[]>>((groups, feed) => {
@@ -203,6 +207,110 @@ export default function SettingsTab({ vm }: SettingsTabProps) {
             Reconnect All
           </button>
         </div>
+      </div>
+
+      {/* AI Analysis */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-4">
+        <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">🤖 AI Trade Analysis</h2>
+        <p className="text-xs text-gray-500">Uses ChatGPT to analyze your trade history and suggest improvements to the signal scoring model.</p>
+        <button
+          onClick={async () => {
+            if (!user) { setAiError('Sign in to use AI analysis'); return; }
+            setAiLoading(true);
+            setAiError(null);
+            setAiResult(null);
+            try {
+              const result = await fetchAIAnalysis(user.id);
+              setAiResult(result);
+            } catch (err: any) {
+              setAiError(err.message || 'AI analysis failed');
+            } finally {
+              setAiLoading(false);
+            }
+          }}
+          disabled={aiLoading}
+          className="w-full bg-purple-900/50 hover:bg-purple-800/50 text-purple-300 text-sm font-bold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {aiLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+              Analyzing trades...
+            </span>
+          ) : '🔍 Analyze My Trades'}
+        </button>
+
+        {aiError && (
+          <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3">
+            <p className="text-xs text-red-400">{aiError}</p>
+          </div>
+        )}
+
+        {aiResult && (
+          <div className="space-y-3">
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="bg-gray-800 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-white">{aiResult.totalTrades}</p>
+                <p className="text-[10px] text-gray-500">Trades</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-green-400">{aiResult.winRate.toFixed(1)}%</p>
+                <p className="text-[10px] text-gray-500">Win Rate</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-green-400">+{aiResult.avgProfitPercent.toFixed(2)}%</p>
+                <p className="text-[10px] text-gray-500">Avg Win</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-red-400">-{aiResult.avgLossPercent.toFixed(2)}%</p>
+                <p className="text-[10px] text-gray-500">Avg Loss</p>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="bg-gray-800 rounded-lg p-3">
+              <p className="text-xs text-gray-300">{aiResult.summary}</p>
+            </div>
+
+            {/* Best/Worst Conditions */}
+            {aiResult.bestConditions.length > 0 && (
+              <div>
+                <p className="text-xs text-green-400 font-medium mb-1">✅ Best Conditions</p>
+                <ul className="text-xs text-gray-400 space-y-0.5 ml-3 list-disc">
+                  {aiResult.bestConditions.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+            {aiResult.worstConditions.length > 0 && (
+              <div>
+                <p className="text-xs text-red-400 font-medium mb-1">❌ Worst Conditions</p>
+                <ul className="text-xs text-gray-400 space-y-0.5 ml-3 list-disc">
+                  {aiResult.worstConditions.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {/* Weight Adjustments */}
+            {aiResult.weightAdjustments.length > 0 && aiResult.weightAdjustments.some(w => w.currentMax !== w.suggestedMax) && (
+              <div>
+                <p className="text-xs text-purple-400 font-medium mb-1">📊 Suggested Weight Adjustments</p>
+                <div className="space-y-1.5">
+                  {aiResult.weightAdjustments.map((w, i) => (
+                    <div key={i} className="bg-gray-800 rounded-lg p-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-300 font-medium">{w.category}</span>
+                        <span className="text-xs text-gray-400">
+                          {w.currentMax} → <span className={w.suggestedMax > w.currentMax ? 'text-green-400' : w.suggestedMax < w.currentMax ? 'text-red-400' : 'text-gray-400'}>{w.suggestedMax}</span> pts
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{w.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* About */}
