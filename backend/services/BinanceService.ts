@@ -225,6 +225,63 @@ export async function fetchBookTicker(symbol: string): Promise<BookTicker | null
   return null;
 }
 
+// ── Fetch available Binance Futures symbols ────────────────────
+
+export interface FuturesSymbolInfo {
+  symbol: string;       // e.g. "BTCUSDT"
+  pair: string;         // e.g. "BTC/USDT" (display format)
+  baseAsset: string;    // e.g. "BTC"
+  quoteAsset: string;   // e.g. "USDT"
+  status: string;
+}
+
+let cachedFuturesSymbols: FuturesSymbolInfo[] | null = null;
+let cachedFuturesSymbolsAt = 0;
+
+export async function fetchFuturesSymbols(): Promise<FuturesSymbolInfo[]> {
+  // Return cache if less than 1 hour old
+  if (cachedFuturesSymbols && Date.now() - cachedFuturesSymbolsAt < 3_600_000) {
+    return cachedFuturesSymbols;
+  }
+
+  for (const baseURL of FUTURES_REST_URLS) {
+    try {
+      const url = `${baseURL}/fapi/v1/exchangeInfo`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json() as any;
+      const symbols: FuturesSymbolInfo[] = (data.symbols || [])
+        .filter((s: any) => s.status === 'TRADING' && s.contractType === 'PERPETUAL')
+        .map((s: any) => ({
+          symbol: s.symbol,
+          pair: `${s.baseAsset}/${s.quoteAsset}`,
+          baseAsset: s.baseAsset,
+          quoteAsset: s.quoteAsset,
+          status: s.status,
+        }))
+        .sort((a: FuturesSymbolInfo, b: FuturesSymbolInfo) => a.symbol.localeCompare(b.symbol));
+      cachedFuturesSymbols = symbols;
+      cachedFuturesSymbolsAt = Date.now();
+      console.log(`[Binance Futures] Fetched ${symbols.length} perpetual symbols`);
+      return symbols;
+    } catch { continue; }
+  }
+
+  // Fallback: return hardcoded popular symbols
+  console.warn('[Binance Futures] Could not fetch exchangeInfo, using fallback symbols');
+  const fallback: FuturesSymbolInfo[] = [
+    { symbol: 'BTCUSDT', pair: 'BTC/USDT', baseAsset: 'BTC', quoteAsset: 'USDT', status: 'TRADING' },
+    { symbol: 'ETHUSDT', pair: 'ETH/USDT', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING' },
+    { symbol: 'SOLUSDT', pair: 'SOL/USDT', baseAsset: 'SOL', quoteAsset: 'USDT', status: 'TRADING' },
+    { symbol: 'BNBUSDT', pair: 'BNB/USDT', baseAsset: 'BNB', quoteAsset: 'USDT', status: 'TRADING' },
+    { symbol: 'XRPUSDT', pair: 'XRP/USDT', baseAsset: 'XRP', quoteAsset: 'USDT', status: 'TRADING' },
+    { symbol: 'DOGEUSDT', pair: 'DOGE/USDT', baseAsset: 'DOGE', quoteAsset: 'USDT', status: 'TRADING' },
+  ];
+  cachedFuturesSymbols = fallback;
+  cachedFuturesSymbolsAt = Date.now();
+  return fallback;
+}
+
 export async function fetchDepth(symbol: string, limit: number = 10): Promise<OrderBookSnapshot | null> {
   // 1. Try Binance Futures first
   for (const baseURL of FUTURES_REST_URLS) {

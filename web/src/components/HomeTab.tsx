@@ -4,6 +4,7 @@ import { totalScore, normalTotal, freshnessLabel, freshnessDotColor } from '../e
 import { usd, fiat, percent, number, toFiat, getExchangeRate } from '../engine/formatters';
 import HelpModal from './HelpModal';
 import GaugeChart from './GaugeChart';
+import SearchableCoinSelect from './SearchableCoinSelect';
 import { useToast } from './Toast';
 
 
@@ -81,18 +82,7 @@ export default function HomeTab({ vm }: HomeTabProps) {
             <div className="flex-1 flex flex-col justify-center mt-2 pl-1">
               <div className="flex items-center gap-2 mb-1">
                 <CryptoLogo pair={vm.cryptoPair} />
-                <select
-                  value={vm.cryptoPair}
-                  onChange={e => vm.setCryptoPair(e.target.value)}
-                  className="bg-transparent text-base font-semibold text-white outline-none appearance-none cursor-pointer pr-4 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%228%22%20height%3D%225%22%20viewBox%3D%220%200%208%205%22%3E%3Cpath%20d%3D%22M1%201l3%203%203-3%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%221.5%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_center]"
-                >
-                <option value="BTC/USDT">BTC/USDT</option>
-                <option value="ETH/USDT">ETH/USDT</option>
-                <option value="SOL/USDT">SOL/USDT</option>
-                <option value="BNB/USDT">BNB/USDT</option>
-                <option value="XRP/USDT">XRP/USDT</option>
-                <option value="DOGE/USDT">DOGE/USDT</option>
-              </select>
+                <SearchableCoinSelect value={vm.cryptoPair} onChange={vm.setCryptoPair} />
               </div>
               <p className={`font-mono text-3xl font-semibold ${sig.price >= sig.entryPrice ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>{usd(sig.price)}</p>
               <div className="flex items-center gap-1.5 mt-0.5">

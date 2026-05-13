@@ -94,6 +94,44 @@ export async function fetchDepth(symbol: string, _limit: number = 10): Promise<O
   return (signal as TradingSignal & { microstructure?: MarketMicrostructure }).microstructure?.orderBook ?? null;
 }
 
+// ── Futures Symbols ────────────────────────────────────────────
+
+export interface FuturesSymbolInfo {
+  symbol: string;       // e.g. "BTCUSDT"
+  pair: string;         // e.g. "BTC/USDT"
+  baseAsset: string;    // e.g. "BTC"
+  quoteAsset: string;   // e.g. "USDT"
+  status: string;
+}
+
+let cachedFuturesSymbols: FuturesSymbolInfo[] | null = null;
+let cachedFuturesSymbolsAt = 0;
+
+export async function fetchFuturesSymbols(): Promise<FuturesSymbolInfo[]> {
+  // Return cache if less than 1 hour old
+  if (cachedFuturesSymbols && Date.now() - cachedFuturesSymbolsAt < 3_600_000) {
+    return cachedFuturesSymbols;
+  }
+  try {
+    const data = await fetchJson<FuturesSymbolInfo[]>('/api/futures-symbols');
+    cachedFuturesSymbols = data;
+    cachedFuturesSymbolsAt = Date.now();
+    return data;
+  } catch (err: any) {
+    console.warn('[fetchFuturesSymbols] Failed:', err.message);
+    // Return fallback
+    const fallback: FuturesSymbolInfo[] = [
+      { symbol: 'BTCUSDT', pair: 'BTC/USDT', baseAsset: 'BTC', quoteAsset: 'USDT', status: 'TRADING' },
+      { symbol: 'ETHUSDT', pair: 'ETH/USDT', baseAsset: 'ETH', quoteAsset: 'USDT', status: 'TRADING' },
+      { symbol: 'SOLUSDT', pair: 'SOL/USDT', baseAsset: 'SOL', quoteAsset: 'USDT', status: 'TRADING' },
+      { symbol: 'BNBUSDT', pair: 'BNB/USDT', baseAsset: 'BNB', quoteAsset: 'USDT', status: 'TRADING' },
+      { symbol: 'XRPUSDT', pair: 'XRP/USDT', baseAsset: 'XRP', quoteAsset: 'USDT', status: 'TRADING' },
+      { symbol: 'DOGEUSDT', pair: 'DOGE/USDT', baseAsset: 'DOGE', quoteAsset: 'USDT', status: 'TRADING' },
+    ];
+    return fallback;
+  }
+}
+
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
   try {
     const data = await fetchJson<{ rates: Record<string, number>; timestamp: number }>('/api/exchange-rates');

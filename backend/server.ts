@@ -16,6 +16,7 @@ import {
   refreshCandlesForInterval,
 } from './services/Cache.js';
 import { connectSymbol, startAutoConnect, getLivePrice, subscribeKline, subscribePrice } from './services/BinanceWebSocket.js';
+import { fetchFuturesSymbols } from './services/BinanceService.js';
 import { processAutoTrades } from './services/AutoTradeService.js';
 import { supabaseAdmin } from './lib/supabase.js';
 
@@ -52,6 +53,7 @@ app.get('/', (_req: Request, res: Response) => {
     version: '1.0.0',
     endpoints: [
       'GET /api/health',
+      'GET /api/futures-symbols',
       'GET /api/signal/:symbol?mode=normal|pro (full refresh)',
       'GET /api/cached-signal/:symbol (cached, no refresh)',
       'GET /api/candles/:symbol?interval=5m|15m|1h|4h',
@@ -65,6 +67,18 @@ app.get('/', (_req: Request, res: Response) => {
 
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+});
+
+// ── Futures Symbols Endpoint ─────────────────────────────────
+
+app.get('/api/futures-symbols', async (_req: Request, res: Response) => {
+  try {
+    const symbols = await fetchFuturesSymbols();
+    res.json(symbols);
+  } catch (err: any) {
+    console.error('[Futures Symbols] Error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch futures symbols' });
+  }
 });
 
 app.get('/api/status', (_req: Request, res: Response) => {
